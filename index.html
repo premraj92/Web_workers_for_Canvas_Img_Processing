@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web workers imag processing Demo</title>
+
+    <style>
+        html {
+            font-family:'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+        }
+
+        body {
+            margin: 0;
+            padding: 2rem;
+        }
+        #input {
+            width: 0px;
+            height: 0px;
+            overflow: hidden;
+        }
+
+        #input + label {
+            display: inline-block;
+            background-color:blueviolet;
+            padding: 0.5rem 1rem;
+            color: #fff;
+            border-radius: 5px;
+        }
+
+        #input:focus + label {
+            outline: 3px solid blueviolet;
+            outline-offset: 2px;
+        }
+
+        canvas {
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <input type="file" accept="image/*" name="img" id="input">
+        <label for="input">Choose Input</label>
+    </div>
+
+    <canvas id="preview"></canvas>
+</body>
+
+<script>
+    // Bringing web workers into play - i.e. creating a Worker using the Worker() constructor 
+    const worker = new Worker('./worker.js')
+
+    // Step 1 : read the user uploaded image from the file Input element programtaically
+    const $imageInput = document.querySelector('#input')
+    const $preview = document.querySelector('#preview')
+    const $previewCxt = $preview.getContext('2d')
+
+    worker.onmessage = (processedCanvasImgData) => {
+            const parsedCanvasImgData = processedCanvasImgData.data
+            $previewCxt.putImageData(parsedCanvasImgData, 0, 0)
+    }
+
+    // method that handles the image Processing
+    processCanvasImage = (imageWidth, imageHeight) => {
+        const canvasImgData = $previewCxt.getImageData(0, 0, imageWidth, imageHeight)
+        console.log(`Image data from Canvas using getImageData `,canvasImgData)
+
+        // you should always pass objects like this below as buffer & not as direct object - it will not work with workers
+        
+        // // worker.postMessage(canvasImgData)
+        // // we should always use the below way to transfer the Image Buffers i.e. instead of making a new copy of image & sending it to worker thread we are sharing the current image location & control from Main/UI thread to Worker thread the above line where we just send plain object via worker.postMessage(canvasImgData) will copy the image & send it
+        worker.postMessage(canvasImgData, [canvasImgData.data.buffer])
+    }
+    
+    $imageInput.addEventListener('change', (e) => {
+        console.log(`User input is `, e.target.files[0])
+        const imageDataURL = e.target.files[0]
+
+        // Instead of the fileReader API to create a base264 representation of an Image as done in the index_without_web_workers.html in this same folder, we use the more powerful promise based createImageBitmap API & since its promise based it does not block the main thread 
+
+        createImageBitmap(imageDataURL)
+            .then((bitmap) => {
+                console.log(bitmap)
+                $preview.width = bitmap.width
+                $preview.height = bitmap.height
+                $previewCxt.drawImage(bitmap, 0, 0)
+
+                processCanvasImage(bitmap.width, bitmap.height)
+            })
+    })
+</script>
+</html>

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Main UI thread image processing Demo without workers</title>
+
+    <style>
+        html {
+            font-family:'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+        }
+
+        body {
+            margin: 0;
+            padding: 2rem;
+        }
+        #input {
+            width: 0px;
+            height: 0px;
+            overflow: hidden;
+        }
+
+        #input + label {
+            display: inline-block;
+            background-color:blueviolet;
+            padding: 0.5rem 1rem;
+            color: #fff;
+            border-radius: 5px;
+        }
+
+        #input:focus + label {
+            outline: 3px solid blueviolet;
+            outline-offset: 2px;
+        }
+
+        canvas {
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <input type="file" accept="image/*" name="img" id="input">
+        <label for="input">Choose Input</label>
+    </div>
+
+    <canvas id="preview"></canvas>
+</body>
+
+<script>
+    // Step 1 : read the user uploaded image from the file Input element programtaically
+    const $imageInput = document.querySelector('#input')
+    const $preview = document.querySelector('#preview')
+    const $previewCxt = $preview.getContext('2d')
+
+    const fileReader = new FileReader()
+    const image = new Image()
+
+
+    // method that handles the image Processing logic
+    processCanvasImage = () => {
+        const canvasImgData = $previewCxt.getImageData(0, 0, image.width, image.height)
+        console.log(canvasImgData)
+
+        for(let y=0; y < image.height; y++) {
+            for (let x=0; x < image.width ;x++) {
+                const index = (x + (y * image.width)) * 4
+
+                canvasImgData.data[index] = canvasImgData.data[index] * 1.9
+                // canvasImgData.data[index + 3] = 50
+            }
+        }
+
+        $previewCxt.putImageData(canvasImgData, 0, 0)
+    }
+    
+    $imageInput.addEventListener('change', (e) => {
+        console.log(`User input is `, e.target.files[0])
+        const imageDataURL = e.target.files[0]
+
+        fileReader.readAsDataURL(imageDataURL)
+
+
+        // // Instead of the above fileReader API to create a base264 representation of an Image we use the more powerful promise based createImageBitmap API & since its promise based it does not block the main thread 
+
+        // createImageBitmap(imageDataURL)
+        //     .then((bitmap) => {
+        //         console.log(bitmap)
+        //         $preview.width = bitmap.width
+        //         $preview.height = bitmap.height
+        //         $previewCxt.drawImage(bitmap, 0, 0)
+        //     })
+    })
+
+    // If we use the below file Reader API it takes a long time to process Very Large/Hige Res Images & since unlike createBitImageMap() fileReader is not Promise Based which means it BLOCKS the MAIN THREAD for long time even for a few seconds or more depending on the Image Size which is VERY BAD &
+    fileReader.addEventListener('load', (e) => {
+        const imagebase264 = e.target.result
+        image.src = imagebase264
+    })
+
+    image.addEventListener('load', (e) => {
+        $preview.width = image.width
+        $preview.height = image.height
+        $previewCxt.drawImage(image, 0, 0)
+
+        processCanvasImage()
+    })
+</script>
+</html>
